@@ -1,0 +1,9 @@
+# IDE
+.idea/
+.vscode/
+
+# Claude Code local settings (machine-specific, not meant to be shared)
+.claude/settings.local.json
+
+# OS
+.DS_Store
