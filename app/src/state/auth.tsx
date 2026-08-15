@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Platform } from "react-native";
 import { useToast } from "./toast";
 import type { User } from "../types";
 
@@ -9,6 +10,23 @@ WebBrowser.maybeCompleteAuthSession();
 
 const STORAGE_KEY = "tcg-auth-session";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+
+// Google's Android/iOS OAuth clients inherently trust a redirect whose
+// scheme is this exact reversed-client-ID form — no extra Console toggle
+// needed, unlike an arbitrary custom scheme (which needs "Enable Custom URI
+// Scheme" and, in practice, was enforced inconsistently). Derived from
+// whichever client ID applies to the current platform so it stays correct
+// if either changes.
+function nativeGoogleRedirectUri(): string | undefined {
+  const clientId = Platform.select({
+    ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    default: undefined,
+  });
+  if (!clientId) return undefined;
+  const id = clientId.replace(/\.apps\.googleusercontent\.com$/, "");
+  return `com.googleusercontent.apps.${id}:/oauthredirect`;
+}
 
 interface StoredSession {
   token: string;
@@ -34,11 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const { showToast } = useToast();
 
-  const [, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  });
+  const nativeRedirectUri = nativeGoogleRedirectUri();
+  const [, response, promptAsync] = Google.useIdTokenAuthRequest(
+    {
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    },
+    nativeRedirectUri ? { native: nativeRedirectUri } : {}
+  );
 
   const isGoogleConfigured = !!(
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||

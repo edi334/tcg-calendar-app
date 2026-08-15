@@ -25,6 +25,7 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="event/[id]" options={{ title: "Event" }} />
         <Stack.Screen name="trip/[id]" options={{ title: "Trip" }} />
+        <Stack.Screen name="oauthredirect" options={{ headerShown: false }} />
       </Stack>
     </>
   );

@@ -237,6 +237,35 @@ Maps deep-link URLs).
    Credentials page, then fill `GOOGLE_IOS_CLIENT_ID`/`GOOGLE_ANDROID_CLIENT_ID`
    (backend) and their `EXPO_PUBLIC_...` counterparts (app).
 
+**Android specifically** needs two extra things beyond the client ID, both
+one-time setup:
+- The client's **SHA-1 certificate fingerprint** (`eas credentials` →
+  Keystore → view details) — Android clients are validated by package name +
+  SHA-1, not a redirect URI list like Web clients have.
+- The redirect scheme registered in `app.json`'s `android.scheme` to match
+  the client ID (see below) — without it, Google completes the redirect
+  correctly after sign-in, but nothing on the OS catches it, and the browser
+  just dead-ends on a blank google.com instead of returning to the app.
+
+  `expo-auth-session`'s Google provider defaults the native redirect to
+  `<applicationId>:/oauthredirect` (i.e. the app's package name). We
+  initially tried enabling **"Enable Custom URI Scheme"** on the Android
+  client and overriding the redirect to the app's own custom `scheme`
+  instead — that *can* work, but Google enforced it inconsistently in
+  practice (worked once, then rejected the identical request on a later
+  attempt). The reliable fix: Google's Android/iOS OAuth clients inherently
+  trust a redirect using the **reversed-client-ID** scheme —
+  `com.googleusercontent.apps.<client-id-without-the-.apps.googleusercontent.com-suffix>`
+  — with no toggle required, since only the legitimate owner of that client
+  ID could derive it. `auth.tsx`'s `nativeGoogleRedirectUri()` computes this
+  from whichever client ID applies to the current platform, and
+  `app.json`'s `android.scheme` registers the matching intent filter (this
+  value is tied to the Android client ID — if you ever regenerate that
+  client, update this to match the new one).
+- Also needs a route matching the redirect path, or `expo-router` shows its
+  own "Unmatched Route" screen when the redirect lands — see
+  `app/app/oauthredirect.tsx`.
+
 Also set `JWT_SECRET` in `backend/.env` to a long random string — this signs
 the app's own 30-day session tokens after Google verification.
 
