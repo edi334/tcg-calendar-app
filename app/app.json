@@ -11,8 +11,9 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.tcgcalendarapp.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#5B52F0",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,6 +30,12 @@
       "expo-status-bar",
       "expo-web-browser",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4a6cb839-c17b-4244-8a6e-2a750725f690"
+      }
+    }
   }
 }
