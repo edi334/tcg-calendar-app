@@ -44,9 +44,15 @@ return structured data rather than requiring HTML scraping:
   Its `start_time` field always carries a bogus `+12:00` offset regardless of
   the event's real location (Legend Story Studios is NZ-based) — the backend
   strips that and reconstructs the correct UTC instant from the venue's actual
-  country time zone. Most FAB events also have no dedicated listing page at all
-  (the locator is just an embedded map) — "View original listing" only appears
-  when the source actually gives us a real link (e.g. a Facebook event).
+  country time zone. The locator itself has no per-event permalink page (it's
+  an embedded map with inline details), but its client-side router will
+  deep-link straight to a specific event's detail modal given
+  `?tab=event&search=<address>&eventId=<id>` — `eventId` alone silently falls
+  back to a generic "near you" list, it only resolves to the right event when
+  `search` also happens to surface it, which the event's own address reliably
+  does. "View original listing" prefers a real link when the source gives us
+  one (e.g. a Facebook event), and falls back to that locator deep link
+  otherwise — see `buildLocatorUrl` in `backend/src/sources/fabLocator.ts`.
 
 These are undocumented endpoints, not a published API — if either site changes
 its frontend architecture, the corresponding fetcher in `backend/src/sources/`

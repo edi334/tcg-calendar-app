@@ -73,6 +73,21 @@ function toDistanceKm(distance: number | null, unit: string | null): number | nu
   return distance; // API has only ever been observed to return "km"
 }
 
+// The locator has no per-event permalink page, but its client-side router
+// will deep-link straight to an event's detail modal given tab=event +
+// eventId — as long as `search` also returns that event in its result set
+// (eventId alone, with no search term, silently falls back to the generic
+// "near you" list). The event's own address reliably surfaces it.
+function buildLocatorUrl(ev: FabRawEvent): string {
+  const params = new URLSearchParams({
+    tab: "event",
+    privateMode: "false",
+    search: ev.address,
+    eventId: String(ev.id),
+  });
+  return `https://fabtcg.com/locator/?${params}`;
+}
+
 function normalize(ev: FabRawEvent, eventType: EventType): NormalizedEvent {
   const timezone = resolveTimeZone(ev.country);
   const naiveStart = stripOffset(ev.start_time);
@@ -92,11 +107,10 @@ function normalize(ev: FabRawEvent, eventType: EventType): NormalizedEvent {
     priceAmount: null,
     priceCurrency: null,
     format: ev.format_name,
-    // fabtcg.com's locator has no per-event or per-store permalink page (it's
-    // an embedded map with inline details) — event_link (often a Facebook
-    // event) is the only real "original listing" that ever exists. Leave
-    // sourceUrl null rather than guessing a URL that 404s.
-    sourceUrl: ev.event_link,
+    // Prefer the organizer's own listing (often a Facebook event) when the
+    // source gives us one — otherwise fall back to a deep link into the
+    // locator itself, which always works (see buildLocatorUrl above).
+    sourceUrl: ev.event_link ?? buildLocatorUrl(ev),
   };
 }
 
