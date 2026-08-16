@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useCreateTrip, useTrips } from "../../src/api/client";
+import { NewTripSheet } from "../../src/components/NewTripSheet";
 import { TripCard } from "../../src/components/TripCard";
 import { useTheme } from "../../src/theme/ThemeContext";
 
@@ -9,10 +11,14 @@ export default function TripsScreen() {
   const { data: trips, isLoading, isError, refetch, isRefetching } = useTrips();
   const createTrip = useCreateTrip();
   const router = useRouter();
+  const [showNewTripSheet, setShowNewTripSheet] = useState(false);
 
-  function handleNewTrip() {
-    createTrip.mutate(undefined, {
-      onSuccess: (trip) => router.push(`/trip/${trip.id}`),
+  function handleCreate(name: string) {
+    createTrip.mutate(name || undefined, {
+      onSuccess: (trip) => {
+        setShowNewTripSheet(false);
+        router.push(`/trip/${trip.id}`);
+      },
     });
   }
 
@@ -22,8 +28,7 @@ export default function TripsScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>Your trips</Text>
         <TouchableOpacity
           style={[styles.newButton, { backgroundColor: colors.tint }]}
-          onPress={handleNewTrip}
-          disabled={createTrip.isPending}
+          onPress={() => setShowNewTripSheet(true)}
         >
           <Text style={[styles.newButtonText, { color: colors.tintOn }]}>+ New Trip</Text>
         </TouchableOpacity>
@@ -56,6 +61,13 @@ export default function TripsScreen() {
           }
         />
       )}
+
+      <NewTripSheet
+        visible={showNewTripSheet}
+        onClose={() => setShowNewTripSheet(false)}
+        onCreate={handleCreate}
+        isPending={createTrip.isPending}
+      />
     </SafeAreaView>
   );
 }

@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "slug": "tcg-calendar-app",
+    "extra": {
+      "eas": {
+        "projectId": "4a6cb839-c17b-4244-8a6e-2a750725f690"
+      }
+    }
+  }
+}

@@ -43,7 +43,12 @@ export function PushNotificationRegistrar() {
       const pushToken = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
       if (!cancelled) registerPushToken.mutate(pushToken);
     })().catch((err) => {
-      console.error("[push] Failed to register for push notifications:", err);
+      // Non-fatal — push notifications are an optional feature and this is
+      // already fully handled (nothing crashes, sign-in and the rest of the
+      // app work fine either way). console.warn instead of console.error so
+      // it doesn't trigger Expo's full-screen red LogBox overlay in dev for
+      // what isn't actually an error condition in the app.
+      console.warn("[push] Failed to register for push notifications:", err);
     });
 
     return () => {

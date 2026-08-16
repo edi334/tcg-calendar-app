@@ -22,7 +22,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.profileHeader}>
           {me?.avatarUrl ? (
             <Image source={{ uri: me.avatarUrl }} style={styles.avatar} />

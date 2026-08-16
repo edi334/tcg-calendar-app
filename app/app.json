@@ -13,6 +13,7 @@
     "android": {
       "package": "com.tcgcalendarapp.app",
       "scheme": "com.googleusercontent.apps.608763008529-k8r5qej4h734c435u10n5j0jvtgmrgr1",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#5B52F0",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,7 +31,8 @@
       "expo-router",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {},

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useAddEventToTrip, useCreateTrip, useTrips } from "../api/client";
 import { useTheme } from "../theme/ThemeContext";
+import { useKeyboardHeight } from "../utils/useKeyboardHeight";
 
 interface Props {
   visible: boolean;
@@ -16,6 +17,7 @@ export function AddToTripSheet({ visible, eventId, onClose }: Props) {
   const createTrip = useCreateTrip();
   const [newTripName, setNewTripName] = useState("");
   const [showNewTripInput, setShowNewTripInput] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
 
   function handleAdd(tripId: string) {
     addEventToTrip.mutate({ tripId, eventId }, { onSuccess: onClose });
@@ -33,8 +35,12 @@ export function AddToTripSheet({ visible, eventId, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={[styles.sheet, { backgroundColor: colors.surface }]}>
+      <View style={styles.backdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.sheet, { backgroundColor: colors.surface, marginBottom: keyboardHeight }]}
+        >
           <Text style={[styles.title, { color: colors.text }]}>Add to trip</Text>
 
           {trips?.map((trip) => {
@@ -79,7 +85,7 @@ export function AddToTripSheet({ visible, eventId, onClose }: Props) {
             <Text style={{ color: colors.textSecondary, fontWeight: "600" }}>Cancel</Text>
           </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
