@@ -1,21 +1,28 @@
 const path = require("path");
 const { execFile } = require("child_process");
 const express = require("express");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const PORT = process.env.PORT || 3001;
 const CACHE_TTL_MS = 5 * 60 * 1000;
+// Set when mounted under a path prefix behind a shared-host Ingress (e.g.
+// "/downloads"). All links/routes are built from this so the page works
+// correctly at a sub-path, not just at the domain root. Leave unset to run
+// at "/" (e.g. local dev).
+const BASE_PATH = (process.env.BASE_PATH || "").replace(/\/+$/, "");
 
 const EAS_BIN = path.join(__dirname, "..", "node_modules", ".bin", "eas");
 const EAS_PROJECT_DIR = path.join(__dirname, "..", "eas-project");
 
-const PROFILES = ["production", "development"];
-const cache = {};
+const PROFILE = "production";
+let cache = null;
 
-function fetchLatestBuild(profile) {
+function fetchLatestBuild() {
   return new Promise((resolve, reject) => {
     execFile(
       EAS_BIN,
-      ["build:list", "-p", "android", "-e", profile, "--status", "finished", "--limit", "1", "--json", "--non-interactive"],
+      ["build:list", "-p", "android", "-e", PROFILE, "--status", "finished", "--limit", "1", "--json", "--non-interactive"],
       { cwd: EAS_PROJECT_DIR, env: process.env, maxBuffer: 10 * 1024 * 1024, timeout: 30000 },
       (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
@@ -30,11 +37,10 @@ function fetchLatestBuild(profile) {
   });
 }
 
-async function getLatestBuild(profile) {
-  const cached = cache[profile];
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.data;
-  const data = await fetchLatestBuild(profile);
-  cache[profile] = { data, fetchedAt: Date.now() };
+async function getLatestBuild() {
+  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.data;
+  const data = await fetchLatestBuild();
+  cache = { data, fetchedAt: Date.now() };
   return data;
 }
 
@@ -47,20 +53,13 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
 }
 
-const PROFILE_LABELS = {
-  production: { title: "Production", blurb: "Signed release APK. Install this for everyday use." },
-  development: { title: "Development", blurb: "Dev-client build. Requires `npx expo start --dev-client` to run the JS bundle." },
-};
-
-function renderCard(profile, result) {
-  const label = PROFILE_LABELS[profile];
-
+function renderCard(result) {
   if (result.status === "error") {
     return `
       <section class="card">
-        <h2>${label.title}</h2>
-        <p class="blurb">${label.blurb}</p>
-        <p class="error">Couldn't load build info: ${escapeHtml(result.message)}</p>
+        <h2>Production</h2>
+        <p class="blurb">Signed release APK. Install this for everyday use.</p>
+        <p class="error">Couldn't load build info right now. Try again shortly.</p>
       </section>`;
   }
 
@@ -68,8 +67,8 @@ function renderCard(profile, result) {
   if (!build) {
     return `
       <section class="card">
-        <h2>${label.title}</h2>
-        <p class="blurb">${label.blurb}</p>
+        <h2>Production</h2>
+        <p class="blurb">Signed release APK. Install this for everyday use.</p>
         <p class="empty">No finished build yet.</p>
       </section>`;
   }
@@ -79,8 +78,8 @@ function renderCard(profile, result) {
 
   return `
     <section class="card">
-      <h2>${label.title}</h2>
-      <p class="blurb">${label.blurb}</p>
+      <h2>Production</h2>
+      <p class="blurb">Signed release APK. Install this for everyday use.</p>
       <dl class="meta">
         <dt>Version</dt><dd>${escapeHtml(build.appVersion || "?")} (build ${escapeHtml(build.appBuildVersion || "?")})</dd>
         <dt>Built</dt><dd>${formatDate(build.createdAt)}</dd>
@@ -90,12 +89,12 @@ function renderCard(profile, result) {
       ${
         expired
           ? `<p class="error">This build's download link has expired. Trigger a new EAS build.</p>`
-          : `<a class="download" href="/download/${profile}">Download APK</a>`
+          : `<a class="download" href="${BASE_PATH}/download/production">Download APK</a>`
       }
     </section>`;
 }
 
-const PAGE_STYLE = `
+const PAGE_CSS = `
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
@@ -104,17 +103,17 @@ const PAGE_STYLE = `
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: linear-gradient(160deg, #1a1730 0%, #241b3d 55%, #2c1f4a 100%);
     color: #f1eefc;
-    padding: 24px 16px 48px;
+    padding: clamp(20px, 6vw, 48px) 16px;
   }
-  header { max-width: 640px; margin: 0 auto 28px; text-align: center; }
-  header h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  header { max-width: 440px; margin: 0 auto clamp(20px, 5vw, 32px); text-align: center; }
+  header h1 { font-size: clamp(1.4rem, 4vw, 1.8rem); margin: 0 0 6px; }
   header p { margin: 0; color: #b8b0d9; font-size: 0.95rem; }
-  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  main { max-width: 440px; margin: 0 auto; }
   .card {
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 16px;
-    padding: 20px 22px;
+    padding: clamp(18px, 5vw, 26px);
   }
   .card h2 { margin: 0 0 4px; font-size: 1.2rem; }
   .blurb { margin: 0 0 14px; color: #b8b0d9; font-size: 0.88rem; }
@@ -137,62 +136,70 @@ const PAGE_STYLE = `
   .download:active { opacity: 0.85; }
   .error { color: #ff9b9b; font-size: 0.88rem; margin: 0; }
   .empty { color: #9086b8; font-size: 0.88rem; margin: 0; }
-  footer { max-width: 640px; margin: 28px auto 0; text-align: center; color: #736a97; font-size: 0.78rem; }
+  footer { max-width: 440px; margin: 24px auto 0; text-align: center; color: #736a97; font-size: 0.78rem; }
 `;
-
-async function loadAll() {
-  const results = {};
-  await Promise.all(
-    PROFILES.map(async (profile) => {
-      try {
-        const build = await getLatestBuild(profile);
-        results[profile] = { status: "ok", build };
-      } catch (err) {
-        results[profile] = { status: "error", message: err.message };
-      }
-    })
-  );
-  return results;
-}
 
 const app = express();
 
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.use(helmet());
+
+const pageLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
+
+// Not prefixed: k8s probes hit the pod directly on its containerPort,
+// bypassing the Ingress and its path prefix entirely.
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 
-app.get("/", async (_req, res) => {
-  const results = await loadAll();
-  const cards = PROFILES.map((profile) => renderCard(profile, results[profile])).join("\n");
+app.get(`${BASE_PATH}/style.css`, (_req, res) => {
+  res.set("Content-Type", "text/css; charset=utf-8");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.send(PAGE_CSS);
+});
+
+const indexPaths = BASE_PATH ? [BASE_PATH, `${BASE_PATH}/`] : ["/"];
+
+app.get(indexPaths, pageLimiter, async (_req, res) => {
+  let result;
+  try {
+    result = { status: "ok", build: await getLatestBuild() };
+  } catch (err) {
+    console.error("[downloads-site] failed to load latest build:", err.message);
+    result = { status: "error" };
+  }
+
   res.set("Content-Type", "text/html; charset=utf-8");
   res.send(`<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TCG Calendar App — Builds</title>
-  <style>${PAGE_STYLE}</style>
+  <meta name="robots" content="noindex, nofollow" />
+  <title>TCG Calendar App — Download</title>
+  <link rel="stylesheet" href="${BASE_PATH}/style.css" />
 </head>
 <body>
   <header>
     <h1>TCG Calendar App</h1>
-    <p>Latest Android builds, pulled live from EAS.</p>
+    <p>Latest Android build, pulled live from EAS.</p>
   </header>
   <main>
-    ${cards}
+    ${renderCard(result)}
   </main>
-  <footer>Refreshes automatically — links always point at the newest finished build.</footer>
+  <footer>Refreshes automatically — the link always points at the newest finished build.</footer>
 </body>
 </html>`);
 });
 
-app.get("/download/:profile", async (req, res) => {
-  const profile = req.params.profile;
-  if (!PROFILES.includes(profile)) return res.status(404).send("Unknown build profile.");
+app.get(`${BASE_PATH}/download/:profile`, pageLimiter, async (req, res) => {
+  if (req.params.profile !== PROFILE) return res.status(404).send("Unknown build profile.");
 
   let build;
   try {
-    build = await getLatestBuild(profile);
+    build = await getLatestBuild();
   } catch (err) {
-    return res.status(502).send(`Failed to fetch build info: ${err.message}`);
+    console.error("[downloads-site] failed to load latest build:", err.message);
+    return res.status(502).send("Failed to fetch build info. Try again shortly.");
   }
   if (!build) return res.status(404).send("No finished build available yet.");
   if (build.expirationDate && new Date(build.expirationDate).getTime() < Date.now()) {

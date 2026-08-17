@@ -1,2 +1,5 @@
 node_modules
 *.log
+
+# Contains your private registry host/IP — keep local only
+build.sh
